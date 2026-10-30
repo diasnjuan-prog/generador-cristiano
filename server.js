@@ -1,0 +1,41 @@
+import express from 'express';
+import fs from 'fs';
+import path from 'path';
+import {fileURLToPath} from 'url';
+try{process.loadEnvFile?.()}catch{}
+const D=path.dirname(fileURLToPath(import.meta.url));
+const {OPENAI_API_KEY,APP_PASSWORD,IMAGE_MODEL='gpt-image-1',IMAGE_QUALITY='medium',TEXT_MODEL='gpt-4o-mini',DATA_DIR=path.join(D,'data'),PORT=3000}=process.env;
+fs.mkdirSync(path.join(DATA_DIR,'img'),{recursive:true});
+const HF=path.join(DATA_DIR,'historial.json');
+const load=()=>{try{return JSON.parse(fs.readFileSync(HF,'utf8'))}catch{return[]}};
+const save=h=>fs.writeFileSync(HF,JSON.stringify(h));
+const norm=s=>String(s).toLowerCase().normalize('NFD').replace(/[^a-z0-9 ]/g,'').trim();
+const ESTILOS=['Warm golden tones, soft natural shadows, epic cinematic color grading.','Lit mainly by oil lamps and candles, deep chiaroscuro shadows, amber glow.','Golden-hour sunrise backlight, light haze, rim light, hopeful atmosphere.','Moonlit night, deep blue shadows with warm firelight accents, serene mood.','Harsh desert sunlight, dust in the air, wide dramatic sky, earthy palette.'];
+const app=express();app.use(express.json());
+app.use(express.static(path.join(D,'public')));
+const auth=(q,r,n)=>(!APP_PASSWORD||q.get('x-clave')===APP_PASSWORD)?n():r.status(401).json({error:'Clave incorrecta'});
+app.use('/img',auth,express.static(path.join(DATA_DIR,'img')));
+const oa=async(u,b)=>{const r=await fetch('https://api.openai.com/v1/'+u,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+OPENAI_API_KEY},body:JSON.stringify(b)});const j=await r.json();if(!r.ok)throw new Error(j.error?.message||'Error de OpenAI');return j};
+const falta=(r)=>r.status(400).json({error:'Falta configurar OPENAI_API_KEY (ver LEEME.md).'});
+app.get('/api/estado',(q,r)=>r.json({apiLista:!!OPENAI_API_KEY,requiereClave:!!APP_PASSWORD}));
+app.get('/api/historial',auth,(q,r)=>r.json(load()));
+app.post('/api/ideas',auth,async(q,r)=>{try{if(!OPENAI_API_KEY)return falta(r);
+const {categoria='Variadas (mezcla)',n=1,frase,soloEscena}=q.body,h=load();
+const fr=h.slice(-200).map(i=>i.frase).join(' | '),es=h.slice(-30).map(i=>i.escena).join(' | ');
+const sys=`Eres un redactor cristiano y director de fotografía de cine bíblico. Devuelve SOLO JSON: {"ideas":[{"frase":"","tipo":"reflexion"|"versiculo","referencia":"","personaje":"","escena":""}]}.
+Reglas: frases en español, originales, de 6 a 16 palabras, emotivas, fáciles de leer, con ortografía impecable. Varía temas, estructura y palabras. Jamás presentes una frase inventada como cita literal de la Biblia ni atribuyas a Dios promesas bíblicas inventadas. Usa tipo "versiculo" SOLO si la frase parafrasea un pasaje real y pon su referencia correcta (ej. "Juan 14:27"); si no, tipo "reflexion" y referencia vacía.
+"escena": descripción visual en INGLÉS (2-3 frases) de un fotograma de película bíblica realista: personaje (Jesús con cabello largo, barba y túnica de la época en cerca del 60% de las ideas; también Moisés, David, discípulos, personas orando), expresión del rostro, plano (primer plano del rostro o plano medio), lugar (interior de piedra con lámparas de aceite, camino antiguo, montañas, desierto, aldea, Jerusalén) e iluminación. Cada idea debe diferir claramente en personaje, plano, lugar y colores.`;
+const u=soloEscena?`Mantén exactamente esta frase: "${frase}". Crea 1 escena nueva y distinta a: ${es}`:`Crea ${n} ideas de la categoría: ${categoria}. NO repitas ni imites estas frases anteriores: ${fr}. Evita estas escenas recientes: ${es}`;
+const s=JSON.parse((await oa('chat/completions',{model:TEXT_MODEL,temperature:1.1,response_format:{type:'json_object'},messages:[{role:'system',content:sys},{role:'user',content:u}]})).choices[0].message.content);
+let L=(s.ideas||[]).filter(i=>i.frase&&i.escena);if(soloEscena)L=L.map(i=>({...i,frase}));else L=L.filter(i=>!h.some(x=>norm(x.frase)===norm(i.frase)));
+r.json(L.slice(0,n))}catch(e){r.status(500).json({error:e.message})}});
+app.post('/api/imagen',auth,async(q,r)=>{try{if(!OPENAI_API_KEY)return falta(r);
+const {idea,categoria,estilo=0,fecha,variante}=q.body;
+const prompt=`Cinematic photorealistic film still from a high-budget biblical epic movie. ${idea.escena} ${ESTILOS[estilo]||ESTILOS[0]} ${variante?'Alternate take: different camera angle, expression and framing.':''} Natural skin texture, authentic fabrics of the biblical era, shallow depth of field, 35mm anamorphic lens, subtle film grain. Vertical portrait composition: keep the face in the upper two thirds and leave the lower third darker and uncluttered. Absolutely no text, letters, captions or watermarks. Not a cartoon, not an illustration.`;
+const j=await oa('images/generations',{model:IMAGE_MODEL,prompt,size:'1024x1536',quality:IMAGE_QUALITY,n:1});
+const id=Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+fs.writeFileSync(path.join(DATA_DIR,'img',id+'.png'),Buffer.from(j.data[0].b64_json,'base64'));
+const it={id,fecha:fecha||new Date().toLocaleDateString('sv-SE'),categoria,estilo,frase:idea.frase,tipo:idea.tipo,referencia:idea.referencia||'',personaje:idea.personaje||'',escena:idea.escena,archivo:'/img/'+id+'.png',creado:new Date().toISOString()};
+const h=load();h.push(it);save(h);r.json(it)}catch(e){r.status(500).json({error:e.message})}});
+app.post('/api/frase',auth,(q,r)=>{const h=load(),it=h.find(i=>i.id===q.body.id);if(!it)return r.status(404).json({error:'No existe'});Object.assign(it,{frase:q.body.frase,tipo:q.body.tipo,referencia:q.body.referencia||''});save(h);r.json(it)});
+app.listen(PORT,()=>console.log('Listo en http://localhost:'+PORT));

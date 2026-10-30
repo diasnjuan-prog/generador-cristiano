@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8"><title>Mi Generador Cristiano</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#0b0d14">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Montserrat:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0b0d14;--c:#151a28;--o:#e0b45a;--t:#f5f0e4;--m:#9aa0b4}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(900px 500px at 50% -100px,#2a2236,var(--bg));color:var(--t);font:500 15px Montserrat,system-ui,sans-serif;padding-bottom:80px}
+header{text-align:center;padding:26px 14px 6px}h1{font:700 24px 'Playfair Display',Georgia,serif;letter-spacing:.1em;color:var(--o);margin:4px 0}
+.sub{color:var(--m);font-size:13px}.w{max-width:1000px;margin:auto;padding:0 12px}
+#aviso{display:none;margin:10px 0;padding:12px;border:1px solid var(--o);border-radius:12px;background:#2a2112;font-size:13px}
+.ctl{display:grid;grid-template-columns:1fr;gap:8px;margin:12px 0}@media(min-width:700px){.ctl{grid-template-columns:2fr 1fr 1fr}}
+select,button{font:600 14px Montserrat,system-ui,sans-serif;border-radius:12px;padding:13px;border:1px solid #3a3f55;background:var(--c);color:var(--t)}
+button{cursor:pointer}button.p{background:linear-gradient(135deg,#f0c76e,#c8932f);color:#1a1405;border:0;width:100%;font-size:16px;padding:16px}
+.bs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}button:disabled{opacity:.45}button.o{border-color:var(--o);color:var(--o)}
+#st{margin:10px 0;color:var(--o);min-height:20px;font-size:13px}#st.e{color:#ff8a80}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:#0f1320;border-top:1px solid #2a2f45;z-index:5}nav button{flex:1;border:0;border-radius:0;background:none;color:var(--m);padding:18px 4px}nav button.on{color:var(--o)}
+#g{display:grid;grid-template-columns:1fr 1fr;gap:10px}@media(min-width:800px){#g{grid-template-columns:repeat(4,1fr)}}
+.cd{background:var(--c);border-radius:14px;overflow:hidden}canvas{width:100%;display:block;aspect-ratio:9/16;background:#222}
+.ac{display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:7px}.ac button{padding:9px 2px;font-size:12px}
+h3{color:var(--o);font:700 16px 'Playfair Display',serif;margin:18px 0 8px}.fr{background:var(--c);border-radius:12px;padding:12px;margin-bottom:8px;display:flex;gap:10px;align-items:center;justify-content:space-between}
+.fr small{color:var(--m);display:block;margin-top:4px}.fr button{padding:9px 12px;font-size:12px;flex:none}
+</style></head><body>
+<header><div style="font-size:30px;color:var(--o)">✝</div><h1>MI GENERADOR CRISTIANO</h1><div class="sub" id="fe"></div></header>
+<div class="w"><div id="aviso">⚠️ Aún no hay clave de IA conectada, así que <b>no se pueden crear imágenes</b>. Sigue los pasos de LEEME.md (sección 2). Mientras tanto, puedes ver el historial.</div>
+<button class="p" id="b5">✨ GENERAR IMÁGENES DE HOY</button>
+<div class="ctl"><select id="cat"></select><select id="can"><option value="1">1 imagen</option><option value="2">2 imágenes</option><option value="3">3 imágenes</option><option value="5">5 imágenes</option></select><select id="est"></select></div>
+<div class="bs"><button class="o" id="b1">＋ Generar imagen(es) nueva(s)</button><button id="bm">🌅 Crear contenido para mañana</button><button id="bi">💡 Generar nuevas ideas</button><button id="bz">⬇ Descargar todas (ZIP)</button></div>
+<div id="st"></div><div id="v"></div></div>
+<nav><button data-v="hoy" class="on">Hoy</button><button data-v="ant">Anteriores</button><button data-v="fra">Frases</button></nav>
+<script>
+const $=s=>document.querySelector(s),CATS=['Variadas (mezcla)','Jesús hablando directamente a las personas','«Hijo mío, hoy quiero decirte algo»','«Así te dice Dios»','Confiar en Dios cuando todo parece perdido','La oración y buscar a Dios','Consuelo para quien sufre','Esperar el tiempo de Dios','Perdón, arrepentimiento y salvación','Enseñanzas de Jesús (Evangelios)','Frases basadas en versículos','Esperanza para comenzar un nuevo día','Reflexión cristiana para la noche','Cuando Dios parece no escuchar','Amor, humildad y fe','Escenas bíblicas (Moisés, David, discípulos)'],ES=['Cinematográfico clásico','Luz de lámpara de aceite','Amanecer dorado','Noche serena','Épico del desierto'];
+CATS.forEach(c=>$('#cat').add(new Option(c,c)));ES.forEach((e,i)=>$('#est').add(new Option(e,i)));
+const hoy=()=>new Date().toLocaleDateString('sv-SE'),man=()=>{const d=new Date();d.setDate(d.getDate()+1);return d.toLocaleDateString('sv-SE')};
+const fmt=d=>new Date(d+'T12:00').toLocaleDateString('es',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+$('#fe').textContent=fmt(hoy());
+let H=[],V='hoy',B=false,IDEAS=[];
+const K=()=>localStorage.getItem('clave')||'';
+async function api(u,b){const r=await fetch(u,{method:b?'POST':'GET',headers:{'Content-Type':'application/json','x-clave':K()},body:b?JSON.stringify(b):undefined});
+if(r.status===401){const c=prompt('Escribe la clave de acceso de tu página');if(!c)throw new Error('Se necesita la clave de acceso.');localStorage.setItem('clave',c);return api(u,b)}
+const j=await r.json();if(!r.ok)throw new Error(j.error||'Error');return j}
+const msg=(t,e)=>{$('#st').textContent=t||'';$('#st').className=e?'e':''};
+const busy=b=>{B=b;document.querySelectorAll('button').forEach(x=>x.disabled=b&&x.closest('nav')==null)};
+const imgs={},wrap=(x,t,w)=>{const o=[];let l='';for(const s of t.split(' ')){const n=l?l+' '+s:s;if(x.measureText(n).width>w&&l){o.push(l);l=s}else l=n}o.push(l);return o};
+const cargar=u=>imgs[u]||(imgs[u]=fetch(u,{headers:{'x-clave':K()}}).then(r=>r.blob()).then(b=>new Promise((ok,ko)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=ko;i.src=URL.createObjectURL(b)})));
+async function dibujar(it,W){const s=W/1080,c=document.createElement('canvas');c.width=W;c.height=Math.round(1920*s);const x=c.getContext('2d');x.scale(s,s);const im=await cargar(it.archivo),k=Math.max(1080/im.width,1920/im.height);x.drawImage(im,(1080-im.width*k)/2,(1920-im.height*k)/2,im.width*k,im.height*k);
+const g=x.createLinearGradient(0,1080,0,1920);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,'rgba(0,0,0,.85)');x.fillStyle=g;x.fillRect(0,1080,1080,840);
+x.textAlign='center';x.fillStyle='#fff';x.shadowColor='rgba(0,0,0,.75)';x.shadowBlur=18;let fs=88,L;for(;fs>44;fs-=4){x.font=`700 ${fs}px "Playfair Display",Georgia,serif`;L=wrap(x,it.frase,900);if(L.length*fs*1.28<=480)break}
+const y0=1520-(L.length-1)*fs*.64;L.forEach((l,i)=>x.fillText(l,540,y0+i*fs*1.28));x.font='600 34px Montserrat,sans-serif';x.fillStyle='#e0b45a';x.fillText(it.tipo==='versiculo'&&it.referencia?'Inspirado en '+it.referencia:'Reflexión',540,y0+(L.length-.4)*fs*1.28+40);return c}
+const nombre=it=>`cristiano-${it.fecha}-${it.id}.png`,blob=async(it)=>new Promise(async r=>(await dibujar(it,1080)).toBlob(r,'image/png'));
+function bajar(b,n){const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=n;document.body.append(a);a.click();a.remove()}
+function crc(u){let c,n,k,t=crc.t;if(!t){t=crc.t=[];for(n=0;n<256;n++){c=n;for(k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}}c=-1;for(n=0;n<u.length;n++)c=t[(c^u[n])&255]^(c>>>8);return(c^-1)>>>0}
+function zip(fs){const e=new TextEncoder(),P=[],C=[];let o=0,cs=0;for(const f of fs){const nm=e.encode(f.name),c=crc(f.data),n=f.data.length,h=new DataView(new ArrayBuffer(30));h.setUint32(0,0x04034b50,1);h.setUint16(4,20,1);h.setUint16(6,2048,1);h.setUint32(14,c,1);h.setUint32(18,n,1);h.setUint32(22,n,1);h.setUint16(26,nm.length,1);P.push(h.buffer,nm,f.data);const d=new DataView(new ArrayBuffer(46));d.setUint32(0,0x02014b50,1);d.setUint16(4,20,1);d.setUint16(6,20,1);d.setUint16(8,2048,1);d.setUint32(16,c,1);d.setUint32(20,n,1);d.setUint32(24,n,1);d.setUint16(28,nm.length,1);d.setUint32(42,o,1);C.push(d.buffer,nm);o+=30+nm.length+n;cs+=46+nm.length}
+const z=new DataView(new ArrayBuffer(22));z.setUint32(0,0x06054b50,1);z.setUint16(8,fs.length,1);z.setUint16(10,fs.length,1);z.setUint32(12,cs,1);z.setUint32(16,o,1);return new Blob([...P,...C,z.buffer],{type:'application/zip'})}
+async function bajarZip(items,n){if(!items.length)return msg('No hay imágenes para descargar.',1);msg('Preparando ZIP…');try{const f=[];for(const it of items)f.push({name:nombre(it),data:new Uint8Array(await(await blob(it)).arrayBuffer())});f.push({name:'frases.txt',data:new TextEncoder().encode(items.map(i=>i.frase+(i.tipo==='versiculo'&&i.referencia?' ('+i.referencia+')':'')).join('\n\n'))});bajar(zip(f),n);msg('ZIP listo.')}catch(e){msg(e.message,1)}}
+async function crear(n,fecha){if(B)return;busy(1);try{msg('Pensando frases y escenas nuevas…');const cat=$('#cat').value,est=+$('#est').value,ideas=await api('/api/ideas',{categoria:cat,n});if(!ideas.length)throw new Error('La IA no devolvió ideas nuevas. Intenta otra vez.');
+for(let i=0;i<ideas.length;i++){msg(`Creando imagen ${i+1} de ${ideas.length}… (puede tardar hasta un minuto cada una)`);H.push(await api('/api/imagen',{idea:ideas[i],categoria:cat,estilo:(est+i)%5,fecha}));await vista()}msg(fecha===hoy()?'¡Listo!':'Contenido de mañana guardado en «Anteriores».')}catch(e){msg(e.message,1)}busy(0);vista()}
+async function rehacer(it,modo){if(B)return;busy(1);try{if(modo==='frase'){msg('Escribiendo otra frase…');const[n]=await api('/api/ideas',{categoria:it.categoria,n:1});if(!n)throw new Error('Sin frase nueva, intenta otra vez.');Object.assign(it,await api('/api/frase',{id:it.id,frase:n.frase,tipo:n.tipo,referencia:n.referencia}))}
+else{msg('Creando nueva imagen… (hasta un minuto)');let idea={...it};if(modo==='escena'){const[n]=await api('/api/ideas',{soloEscena:true,frase:it.frase,categoria:it.categoria,n:1});idea.escena=n.escena}H.push(await api('/api/imagen',{idea,categoria:it.categoria,estilo:it.estilo,fecha:it.fecha,variante:modo==='version'}))}msg('Listo.')}catch(e){msg(e.message,1)}busy(0);vista()}
+function tarjeta(it){const d=document.createElement('div');d.className='cd';dibujar(it,360).then(c=>d.prepend(c)).catch(()=>d.prepend(Object.assign(document.createElement('div'),{textContent:'No se pudo cargar la imagen',style:'padding:30px;color:#999'})));const a=document.createElement('div');a.className='ac';
+[['✎ Frase',()=>rehacer(it,'frase')],['🎬 Escena',()=>rehacer(it,'escena')],['↻ Otra versión',()=>rehacer(it,'version')],['⬇ Descargar',async()=>bajar(await blob(it),nombre(it))],['⧉ Copiar frase',()=>copiar(it.frase)]].forEach(([t,f])=>{const b=document.createElement('button');b.textContent=t;b.onclick=f;a.append(b)});d.append(a);return d}
+const copiar=async t=>{try{await navigator.clipboard.writeText(t);msg('Frase copiada.')}catch(e){msg('No se pudo copiar.',1)}};
+async function vista(){const v=$('#v');v.innerHTML='';const g=document.createElement('div');g.id='g';
+if(V==='hoy'){const l=H.filter(i=>i.fecha===hoy()).reverse();if(!l.length)v.innerHTML='<p class="sub" style="text-align:center;padding:20px">Todavía no hay imágenes de hoy. Pulsa «GENERAR IMÁGENES DE HOY».</p>';l.forEach(i=>g.append(tarjeta(i)));v.append(g)}
+else if(V==='ant'){const ds=[...new Set(H.map(i=>i.fecha))].sort().reverse();if(!ds.length)v.innerHTML='<p class="sub">El historial está vacío.</p>';ds.forEach(d=>{const h=document.createElement('h3');h.textContent=fmt(d);const b=document.createElement('button');b.textContent='⬇ ZIP de este día';b.style.cssText='margin:0 0 8px;padding:9px';b.onclick=()=>bajarZip(H.filter(i=>i.fecha===d),`cristiano-${d}.zip`);const gg=document.createElement('div');gg.id='g';H.filter(i=>i.fecha===d).reverse().forEach(i=>gg.append(tarjeta(i)));v.append(h,b,gg)})}
+else{const s=(t,l)=>{const h=document.createElement('h3');h.textContent=t;v.append(h);l.forEach(i=>{const f=document.createElement('div');f.className='fr';const p=document.createElement('div');p.textContent=i.frase;const sm=document.createElement('small');sm.textContent=i.tipo==='versiculo'&&i.referencia?'Inspirada en '+i.referencia:'Reflexión original';p.append(sm);const b=document.createElement('button');b.textContent='Copiar';b.onclick=()=>copiar(i.frase);f.append(p,b);v.append(f)})};if(IDEAS.length)s('Ideas nuevas (aún sin imagen)',IDEAS);s('Frases creadas',[...H].reverse());if(!H.length&&!IDEAS.length)v.innerHTML='<p class="sub">Aún no hay frases.</p>'}}
+$('#b5').onclick=()=>crear(5,hoy());$('#b1').onclick=()=>crear(+$('#can').value,hoy());$('#bm').onclick=()=>crear(5,man());
+$('#bz').onclick=()=>bajarZip(H.filter(i=>i.fecha===hoy()),`cristiano-${hoy()}.zip`);
+$('#bi').onclick=async()=>{if(B)return;busy(1);try{msg('Creando ideas…');IDEAS=await api('/api/ideas',{categoria:$('#cat').value,n:5});V='fra';document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===V));msg('Ideas listas en la pestaña Frases.')}catch(e){msg(e.message,1)}busy(0);vista()};
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{V=b.dataset.v;document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));vista()});
+(async()=>{try{await Promise.all(['700 40px "Playfair Display"','600 30px Montserrat'].map(f=>document.fonts.load(f)))}catch(e){}
+try{const e=await fetch('/api/estado').then(r=>r.json());if(!e.apiLista)$('#aviso').style.display='block';H=await api('/api/historial')}catch(e){msg(e.message,1)}vista()})();
+</script></body></html>
